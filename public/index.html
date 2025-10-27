@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Storm Tracker WX</title>
+  <style>
+    :root{
+      --bg:#0b0f14; --panel:#111925; --accent:#3ba9ff; --muted:#9fb3c8; --text:#e6eef7;
+      --card:#0f1520; --border:#1b2633; --good:#23c55e; --warn:#f59e0b; --bad:#ef4444;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{margin:0; background:var(--bg); color:var(--text); font:15px/1.45 system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif}
+    a{color:var(--accent); text-decoration:none}
+    a:hover{text-decoration:underline}
+    header{position:sticky; top:0; z-index:10; background:linear-gradient(180deg,#0b0f14, rgba(11,15,20,.7)); border-bottom:1px solid var(--border)}
+    .wrap{max-width:1200px; margin:0 auto; padding:16px}
+    h1{display:flex; gap:12px; align-items:center; font-size:22px; margin:0}
+    .brand-dot{width:10px; height:10px; border-radius:50%; background:var(--accent); box-shadow:0 0 12px var(--accent)}
+
+    /* Tabs */
+    .tabs{display:flex; gap:8px; margin-top:12px; flex-wrap:wrap}
+    .tab-btn{padding:10px 14px; border:1px solid var(--border); background:var(--panel); color:var(--text); border-radius:10px; cursor:pointer}
+    .tab-btn[aria-selected="true"]{background:rgba(59,169,255,.15); border-color:var(--accent); box-shadow:0 0 0 1px rgba(59,169,255,.35) inset}
+
+    main{max-width:1200px; margin:0 auto; padding:16px}
+    section.panel{display:none; background:var(--panel); border:1px solid var(--border); border-radius:14px; padding:16px}
+    section.panel.active{display:block}
+
+    /* Radar */
+    .radar-frame{width:100%; height:72vh; border:0; border-radius:12px; background:#0a0f15; display:block}
+    .radar-note{margin-top:8px; color:var(--muted); font-size:13px}
+
+    /* Forecast */
+    .controls{display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px}
+    .input{background:var(--card); border:1px solid var(--border); color:var(--text); border-radius:10px; padding:10px 12px}
+    .btn{background:var(--accent); color:#00152b; border:0; padding:10px 14px; border-radius:10px; font-weight:600; cursor:pointer}
+    .btn.alt{background:#1e293b; color:var(--text); border:1px solid var(--border)}
+    .forecast-grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:12px}
+    .card{background:var(--card); border:1px solid var(--border); border-radius:14px; padding:12px}
+    .card h3{margin:0 0 6px 0; font-size:16px}
+    .meta{font-size:13px; color:var(--muted)}
+    .row{display:flex; align-items:center; gap:10px}
+    .row img{width:40px; height:40px}
+
+    /* Streaming */
+    .stream-box{display:grid; gap:12px}
+    .player{width:100%; aspect-ratio:16/9; background:#0a0f15; border:1px solid var(--border); border-radius:12px; overflow:hidden}
+    .player iframe{width:100%; height:100%; border:0}
+    .mono{font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; background:var(--card); border:1px solid var(--border); padding:10px; border-radius:10px}
+
+    /* Team & Sponsors */
+    .grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:12px}
+    .person h4{margin:0 0 6px 0}
+    .small{font-size:13px; color:var(--muted)}
+
+    footer{max-width:1200px; margin:24px auto; color:var(--muted); padding:0 16px}
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap">
+      <h1><span class="brand-dot"></span> Storm Tracker WX</h1>
+      <nav class="tabs" role="tablist" aria-label="Main Tabs">
+        <button class="tab-btn" role="tab" aria-selected="true" data-tab="radar">Radar</button>
+        <button class="tab-btn" role="tab" aria-selected="false" data-tab="forecast">Forecast</button>
+        <button class="tab-btn" role="tab" aria-selected="false" data-tab="stream">Streaming</button>
+        <button class="tab-btn" role="tab" aria-selected="false" data-tab="team">Team</button>
+        <button class="tab-btn" role="tab" aria-selected="false" data-tab="sponsors">Sponsors</button>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <!-- Radar Panel -->
+    <section id="radar" class="panel active" role="tabpanel" aria-labelledby="tab-radar">
+      <h2 style="margin-top:0">NOAA NWS Radar</h2>
+      <iframe class="radar-frame" src="https://radar.weather.gov/" title="NWS Radar"></iframe>
+      <div class="radar-note">If the radar doesn't render (some sites block embedding), <a href="https://radar.weather.gov/" target="_blank" rel="noopener">open radar in a new tab</a>.</div>
+    </section>
+
+    <!-- Forecast Panel -->
+    <section id="forecast" class="panel" role="tabpanel" aria-labelledby="tab-forecast">
+      <h2 style="margin-top:0">Local Forecast (Powered by the free NWS API)</h2>
+      <div class="controls">
+        <input id="lat" class="input" placeholder="Latitude (e.g., 34.54)" inputmode="decimal" />
+        <input id="lon" class="input" placeholder="Longitude (e.g., -84.06)" inputmode="decimal" />
+        <button id="btnFetch" class="btn">Get Forecast</button>
+        <button id="btnGeo" class="btn alt" title="Use your current location">Use My Location</button>
+      </div>
+      <div id="forecastStatus" class="small"></div>
+      <div id="forecastGrid" class="forecast-grid"></div>
+    </section>
+
+    <!-- Streaming Panel -->
+    <section id="stream" class="panel" role="tabpanel" aria-labelledby="tab-stream">
+      <h2 style="margin-top:0">Live Streaming</h2>
+      <div class="player" id="player"><div class="small" style="padding:12px">No stream loaded yet.</div></div>
+    </section>
+
+    <!-- Team Panel -->
+    <section id="team" class="panel" role="tabpanel" aria-labelledby="tab-team">
+      <h2 style="margin-top:0">Our Crew</h2>
+      <div class="grid">
+        <div class="card person"><h4>Nathan Bradley</h4><div class="small">Founder — Founder / Storm Tracker</div></div>
+        <div class="card person"><h4>David Wallis</h4><div class="small">President — Social Media Manager / Coding Specialist</div></div>
+        <div class="card person"><h4>Joey Pisani</h4><div class="small">Lead Meteorologist — Weather Forecasting / Analysis</div></div>
+        <div class="card person"><h4>Nick Carter</h4><div class="small">Lead Storm Chaser — Field Operations</div></div>
+        <div class="card person"><h4>Mandy Jenes</h4><div class="small">Storm Chaser — TCL Media</div></div>
+        <div class="card person"><h4>Jesse Perkins</h4><div class="small">Storm Chaser — TCL Media</div></div>
+        <div class="card person"><h4>Michael Lynn</h4><div class="small">Storm Chaser — TCL Media</div></div>
+        <div class="card person"><h4>Cody Knox</h4><div class="small">Storm Chaser — TCL Media</div></div>
+      </div>
+    </section>
+
+    <!-- Sponsors Panel -->
+    <section id="sponsors" class="panel" role="tabpanel" aria-labelledby="tab-sponsors">
+      <h2 style="margin-top:0">Our Valued Partners</h2>
+      <div class="grid">
+        <div class="card"><h3 style="margin:0 0 4px 0">MIOPS</h3><div class="small">Lightning Trigger Partner</div></div>
+        <div class="card"><h3 style="margin:0 0 4px 0">Maglite</h3><div class="small">4 Year Flashlights Partnership</div></div>
+        <div class="card"><h3 style="margin:0 0 4px 0">By His Grace</h3><div class="small">Faith Based Partnership</div></div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    Built with ❤️ using the free NOAA/NWS APIs. Not affiliated with NOAA/NWS.
+  </footer>
+
+  <script>
+    // Tab logic
+    const tabs = document.querySelectorAll('.tab-btn');
+    const panels = document.querySelectorAll('section.panel');
+    tabs.forEach(btn=>btn.addEventListener('click',()=>{
+      tabs.forEach(b=>b.setAttribute('aria-selected','false'));
+      btn.setAttribute('aria-selected','true');
+      const id = btn.dataset.tab;
+      panels.forEach(p=>p.classList.toggle('active', p.id===id));
+      // persist tab in URL hash
+      history.replaceState(null, '', '#'+id);
+    }));
+    // Restore from hash
+    const hash = location.hash.replace('#','');
+    if(hash){
+      const match = document.querySelector(`.tab-btn[data-tab="${hash}"]`);
+      if(match) match.click();
+    }
+
+    // Forecast via NWS API
+    const $lat = document.getElementById('lat');
+    const $lon = document.getElementById('lon');
+    const $btnFetch = document.getElementById('btnFetch');
+    const $btnGeo = document.getElementById('btnGeo');
+    const $grid = document.getElementById('forecastGrid');
+    const $status = document.getElementById('forecastStatus');
+
+    async function fetchForecast(lat, lon){
+      $status.textContent = 'Loading forecast…';
+      $grid.innerHTML='';
+      try{
+        const pointsUrl = `https://api.weather.gov/points/${lat},${lon}`;
+        const meta = await fetch(pointsUrl, {headers:{'Accept':'application/geo+json'}}).then(r=>{
+          if(!r.ok) throw new Error('Failed to fetch gridpoint');
+          return r.json();
+        });
+        const forecastUrl = meta.properties && meta.properties.forecast;
+        if(!forecastUrl){ throw new Error('No forecast URL returned for that location.'); }
+        const data = await fetch(forecastUrl, {headers:{'Accept':'application/geo+json'}}).then(r=>{
+          if(!r.ok) throw new Error('Failed to fetch forecast');
+          return r.json();
+        });
+        const periods = (data.properties && data.properties.periods) || [];
+        if(periods.length===0){
+          $status.textContent = 'No forecast periods available.';
+          return;
+        }
+        $status.textContent = `Forecast for ${meta.properties.relativeLocation.properties.city}, ${meta.properties.relativeLocation.properties.state}`;
+        $grid.innerHTML = periods.map(p=>{
+          return `<div class="card">
+            <h3>${p.name}</h3>
+            <div class="row">
+              <img alt="${p.shortForecast}" src="${p.icon || ''}">
+              <div>
+                <div class="meta">${p.shortForecast}</div>
+                <div class="meta">Temp: ${p.temperature}°${p.temperatureUnit} · Wind: ${p.windDirection||''} ${p.windSpeed||''}</div>
+              </div>
+            </div>
+            <p style="margin:8px 0 0 0; color:var(--muted)">${p.detailedForecast || ''}</p>
+          </div>`
+        }).join('');
+      }catch(err){
+        console.error(err);
+        $status.textContent = 'Error: '+ err.message + ' (Tip: ensure valid lat/lon like 34.54, -84.06)';
+      }
+    }
+
+    $btnFetch?.addEventListener('click',()=>{
+      const lat = parseFloat($lat.value); const lon = parseFloat($lon.value);
+      if(Number.isFinite(lat) && Number.isFinite(lon)) fetchForecast(lat,lon);
+      else $status.textContent = 'Enter valid numbers for latitude and longitude.';
+    });
+
+    $btnGeo?.addEventListener('click',()=>{
+      if(!navigator.geolocation){ $status.textContent = 'Geolocation not supported by this browser.'; return; }
+      navigator.geolocation.getCurrentPosition(pos=>{
+        const {latitude, longitude} = pos.coords;
+        $lat.value = latitude.toFixed(4); $lon.value = longitude.toFixed(4);
+        fetchForecast(latitude, longitude);
+      }, err=>{ $status.textContent = 'Location error: '+err.message; }, {enableHighAccuracy:true, timeout:10000});
+    });
+
+    // Streaming embed loader — minimal (no controls)
+    const $player = document.getElementById('player');
+
+    const DEFAULT_EMBED = "https://www.youtube.com/embed/live_stream?channel=YOUR_CHANNEL_ID";
+
+    function normalizeYouTubeURL(u){
+      if(!u) return '';
+      try{
+        const url = new URL(u);
+        if(url.hostname === 'www.youtube.com' && url.pathname.startsWith('/embed/')) return url.toString();
+        if(url.hostname === 'www.youtube.com' && url.pathname === '/embed/live_stream') return url.toString();
+        if(url.hostname === 'youtu.be'){
+          const id = url.pathname.slice(1);
+          return id ? `https://www.youtube.com/embed/${id}` : '';
+        }
+        if(url.hostname === 'www.youtube.com' && url.pathname === '/watch'){
+          const id = url.searchParams.get('v');
+          return id ? `https://www.youtube.com/embed/${id}` : '';
+        }
+        if(url.hostname === 'www.youtube.com' && url.pathname.startsWith('/live/')){
+          const id = url.pathname.split('/').pop();
+          return id ? `https://www.youtube.com/embed/${id}` : '';
+        }
+        return '';
+      }catch{ return ''; }
+    }
+
+    function loadPlayer(embedUrl){
+      if(!embedUrl){
+        $player.innerHTML = '<div class="small" style="padding:12px">No stream configured. Add <code>?yt=</code> to the URL or set DEFAULT_EMBED.</div>';
+        return;
+      }
+      $player.innerHTML = `<iframe src="${embedUrl}" allowfullscreen referrerpolicy="no-referrer-when-downgrade"></iframe>`;
+    }
+
+    function initStream(){
+      const params = new URLSearchParams(location.search);
+      let raw = params.get('yt') || localStorage.getItem('ytEmbed') || DEFAULT_EMBED;
+      const isAlreadyEmbed = /^https:\/\/www\.youtube\.com\/embed\//.test(raw) || /embed\/live_stream/.test(raw);
+      const embed = isAlreadyEmbed ? raw : normalizeYouTubeURL(raw);
+      if(embed) localStorage.setItem('ytEmbed', embed);
+      loadPlayer(embed);
+    }
+
+    initStream();
+  </script>
+</body>
+</html>
