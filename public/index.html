@@ -30,6 +30,9 @@
 
     /* Radar */
     .radar-frame{width:100%; height:72vh; border:0; border-radius:12px; background:#0a0f15; display:block}
+    #leafletRadar{width:100%; height:72vh; border:1px solid var(--border); border-radius:12px; background:#0a0f15; display:none}
+    .leaflet-control-container .leaflet-control-attribution{background:rgba(0,0,0,.4); color:#cfe3ff; border-radius:6px; padding:2px 6px}
+    .radar-toggle{margin:8px 0 0 0; color:var(--muted); font-size:13px}
     .radar-note{margin-top:8px; color:var(--muted); font-size:13px}
 
     /* Forecast */
@@ -57,6 +60,8 @@
 
     footer{max-width:1200px; margin:24px auto; color:var(--muted); padding:0 16px}
   </style>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="anonymous"/>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-p4MxX4Z0x8p1y9Qb2d1G9S0oIiMaivGi99ZTSdK6xqY=" crossorigin="anonymous"></script>
 </head>
 <body>
   <header>
@@ -76,8 +81,9 @@
     <!-- Radar Panel -->
     <section id="radar" class="panel active" role="tabpanel" aria-labelledby="tab-radar">
       <h2 style="margin-top:0">NOAA NWS Radar</h2>
-      <iframe class="radar-frame" src="https://radar.weather.gov/" title="NWS Radar"></iframe>
-      <div class="radar-note">If the radar doesn't render (some sites block embedding), <a href="https://radar.weather.gov/" target="_blank" rel="noopener">open radar in a new tab</a>.</div>
+      <iframe class="radar-frame" id="nwsIframe" src="https://radar.weather.gov/" title="NWS Radar"></iframe>
+      <div id="leafletRadar" aria-label="Mobile Radar Map"></div>
+      <div class="radar-toggle" id="radarNote"></div>
     </section>
 
     <!-- Forecast Panel -->
@@ -145,6 +151,57 @@
     const hash = location.hash.replace('#','');
     if(hash){
       const match = document.querySelector(`.tab-btn[data-tab="${hash}"]`);
+      if(match) match.click();
+    }
+
+    // --- Mobile-friendly Radar Fallback ---
+    let leafletInitialized = false;
+    function initLeafletRadar(){
+      if(leafletInitialized) return;
+      const el = document.getElementById('leafletRadar');
+      if(!el) return;
+      leafletInitialized = true;
+      const map = L.map('leafletRadar');
+      const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '© OpenStreetMap contributors'
+      }).addTo(map);
+      // NOAA nowCOAST NEXRAD imagery (WMS)
+      const radar = L.tileLayer.wms('https://nowcoast.noaa.gov/arcgis/services/nowcoast/radar_meteo_imagery_nexrad_time/MapServer/WMSServer', {
+        layers: '1',
+        format: 'image/png',
+        transparent: true,
+        attribution: 'NOAA nowCOAST'
+      }).addTo(map);
+      // Try geolocate for a better center
+      if(navigator.geolocation){
+        navigator.geolocation.getCurrentPosition(pos=>{
+          map.setView([pos.coords.latitude, pos.coords.longitude], 7);
+        },()=>{ map.setView([34.0, -84.0], 6); });
+      } else {
+        map.setView([34.0, -84.0], 6);
+      }
+    }
+
+    function useLeafletRadar(){
+      const iframe = document.getElementById('nwsIframe');
+      const mapDiv = document.getElementById('leafletRadar');
+      const note = document.getElementById('radarNote');
+      if(!iframe || !mapDiv || !note) return;
+      iframe.style.display = 'none';
+      mapDiv.style.display = 'block';
+      note.innerHTML = 'Showing mobile-friendly radar map. On desktop, the official radar page is used.';
+      initLeafletRadar();
+    }
+
+    function useIframeRadar(){
+      const iframe = document.getElementById('nwsIframe');
+      const mapDiv = document.getElementById('leafletRadar');
+      const note = document.getElementById('radarNote');
+      if(!iframe || !mapDiv || !note) return;
+      iframe.style.display = 'block';
+      mapDiv.style.display = 'none';
+      note.innerHTML = 'I"]`);
       if(match) match.click();
     }
 
